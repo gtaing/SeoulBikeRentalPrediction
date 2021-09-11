@@ -1,0 +1,579 @@
+---
+title: "Seoul Project"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Loading the dataset
+
+```{r}
+library(tidyverse)
+library(lvplot)
+```
+
+# Exploratory Data Analysis (EDA)
+
+```{r}
+col_names <- c("Date","Rented Bike Count","Hour", "Temperature", "Humidity", "Wind speed", "Visibility", "Dew point temperature", "Solar Radiation", "Rainfall", "Snowfall", "Seasons", "Holiday", "Functioning Day")
+bike <- read.csv('SeoulBikeData.csv', header = FALSE, sep = ",", col.names = col_names, skip = 1)
+bike
+```
+```{r}
+summary(bike)
+```
+## Seasons
+
+```{r}
+ggplot(data = bike) +
+  geom_histogram(mapping = aes(x = Rented.Bike.Count), 
+                 binwidth = 100, 
+                 boundary = 0, 
+                 fill = "steelblue", 
+                 color = "black") 
+```
+```{r}
+ggplot(data = bike) +
+  geom_bar(stat = "summary", 
+           fun = "mean", 
+           mapping = aes(x = Hour, y = Rented.Bike.Count), 
+           fill = "steelblue",
+           color = "black") +
+  labs(title = "Number of rented bikes per hour") +
+  ylab("Number of rented bikes") 
+```
+```{r}
+ggplot(data = bike) +
+  geom_bar(stat = "summary", 
+           fun = "mean", 
+           mapping = aes(x = Hour, y = Rented.Bike.Count, fill = Seasons),
+           color = "black") +
+  labs(title = "Number of rented bikes per hour") +
+  ylab("Number of rented bikes") 
+```
+```{r}
+
+draw_season_boxplot <- function(season_name, chosen_fill_color) {
+  bike %>% 
+  filter(Seasons == season_name ) %>%
+    ggplot() +
+    geom_boxplot(mapping = aes(x = as.factor(Hour), y = Rented.Bike.Count),
+                 fill = chosen_fill_color,
+                 color = "black") +
+    labs(title = "Number of rented bikes per hour", subtitle = season_name) +
+    ylab("Number of rented bikes") +
+    xlab("Hour") +
+    scale_y_continuous(limits = c(0, 4000))
+}
+
+draw_season_boxplot("Winter", "blueviolet")
+draw_season_boxplot("Spring", "chartreuse4")
+draw_season_boxplot("Summer", "aquamarine2")
+draw_season_boxplot("Autumn", "coral")
+```
+
+
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Seasons, y = Rented.Bike.Count, fill = Seasons)) +
+  labs(title="Distribution of the number of rented bikes each hour by Seasons") +
+  scale_fill_manual(values = c("#FF9933", "#339900", "#FFCC33", "#99CCFF"))
+  
+```
+```{r}
+ggplot(data = bike) +
+  geom_lv(mapping = aes(x = Seasons, y = Rented.Bike.Count, fill = Seasons),
+          k = 4,
+          color = "black",
+          outlier.colour = "red",
+          outlier.size = 1)
+```
+
+
+```{r}
+ggplot(data = bike) +
+  geom_bar(stat =  "summary", 
+           fun = "mean",
+           color = "black",
+           mapping = aes(x = Seasons, 
+                         y = Rented.Bike.Count, 
+                         fill = Seasons
+                         )) +
+  labs(title = "Average number of rented bikes per hour by Seasons") + 
+  ylab("Number of rented bikes per hour") +
+  theme_minimal()
+```
+## Holiday
+
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Holiday, y = Rented.Bike.Count, fill = Holiday)) +
+  ylab("Number of rented bikes per hour") +
+  guides(fill = "none") +
+  scale_fill_brewer(palette = "Paired")
+```
+
+
+```{r}
+ggplot(data = bike) +
+  geom_bar(stat = "summary",
+           fun = "mean",
+           mapping = aes(x = as.factor(Hour), y = Rented.Bike.Count, fill = Holiday),
+           position = "dodge") +
+  xlab("Hour") +
+  ylab("Number of rented bikes") +
+  scale_fill_brewer(palette = "Paired")
+```
+```{r}
+draw_holiday_season_boxplot <- function(season_name){
+  bike %>% 
+  filter(Seasons == season_name) %>%
+  ggplot() +
+    geom_bar(stat = "summary",
+             fun = "mean",
+             na.rm = TRUE,
+             mapping = aes(x = as.factor(Hour), y = Rented.Bike.Count, fill = Holiday),
+             position = "dodge") +
+    labs(title = season_name) +
+    xlab("Hour") +
+    ylab("Number of rented bikes") +
+    scale_y_continuous(limits = c(0,1600)) +
+    scale_fill_brewer(palette = "Paired")
+}
+
+draw_holiday_season_boxplot("Winter")
+draw_holiday_season_boxplot("Spring")
+draw_holiday_season_boxplot("Summer")
+draw_holiday_season_boxplot("Autumn")
+```
+## Weather conditions 
+
+### Temperature
+
+```{r}
+ggplot(data = bike) +
+  geom_histogram(mapping = aes(x = Temperature), 
+                 binwidth = 1,
+                 fill = "steelblue",
+                 color = "black")
+  
+```
+```{r}
+ggplot(data = bike) +
+  geom_histogram(mapping = aes(x = Dew.point.temperature), 
+                 binwidth = 1,
+                 fill = "steelblue",
+                 color = "black")
+```
+
+
+```{r}
+ggplot(data = bike, mapping = aes(x = Temperature, y = ..density..)) +
+  geom_density(alpha = 0.5, fill = "steelblue") +
+  geom_histogram(binwidth = 1, alpha = 0.5, fill = "white", color = "black")
+```
+```{r}
+ggplot(data = bike, mapping = aes(x = Dew.point.temperature, y = ..density..)) +
+  geom_density(alpha = 0.5, fill = "steelblue") +
+  geom_histogram(binwidth = 1, alpha = 0.5, fill = "white", color = "black")
+```
+
+
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Seasons, y = Temperature, fill = Seasons)) 
+```
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Seasons, y = Dew.point.temperature, fill = Seasons))
+```
+
+
+```{r}
+ggplot(data = bike, mapping = aes(x = Dew.point.temperature, y = Temperature)) +
+  geom_point() 
+```
+```{r}
+ggplot(data = bike, mapping = aes(x = Temperature, y = Rented.Bike.Count)) +
+  geom_boxplot(mapping = aes(group = cut_width(Temperature, 1)), na.rm = T)
+
+ggplot(data = bike, mapping = aes(x = Temperature, y = Rented.Bike.Count)) +
+  geom_boxplot(mapping = aes(group = cut_width(Temperature, 2)), na.rm = T)
+
+ggplot(data = bike, mapping = aes(x = Temperature, y = Rented.Bike.Count)) +
+  geom_boxplot(mapping = aes(group = cut_width(Temperature, 4)), na.rm = T)
+```
+```{r}
+ggplot(data = bike, mapping = aes(x = Dew.point.temperature, y = Rented.Bike.Count)) +
+  geom_boxplot(mapping = aes(group = cut_width(Dew.point.temperature, 1)), na.rm = T)
+
+ggplot(data = bike, mapping = aes(x = Dew.point.temperature, y = Rented.Bike.Count)) +
+  geom_boxplot(mapping = aes(group = cut_width(Dew.point.temperature, 2)), na.rm = T)
+
+ggplot(data = bike, mapping = aes(x = Dew.point.temperature, y = Rented.Bike.Count)) +
+  geom_boxplot(mapping = aes(group = cut_width(Dew.point.temperature, 4)), na.rm = T)
+```
+
+
+```{r}
+ggplot(data = bike) +
+  geom_bar(stat = "summary",
+           fun = "mean",
+           mapping = aes(x = Temperature, y = Rented.Bike.Count)) +
+  ylab("Average number of bikes per hour") +
+  labs(title = "Average number of bikes per hour by temperature")
+```
+```{r}
+ggplot(data = bike) +
+  geom_bar(stat = "summary",
+           fun = "mean",
+           mapping = aes(x = Dew.point.temperature, y = Rented.Bike.Count)) +
+  ylab("Average number of bikes per hour") +
+  labs(title = "Average number of bikes per hour by dew temperature")
+```
+### Solar Radiation
+
+```{r}
+bike %>%
+  filter(Solar.Radiation > 0.01) %>%
+  ggplot() +
+    geom_histogram(mapping = aes(x = Solar.Radiation, y =..density..), binwidth = 0.01)
+```
+```{r}
+ggplot(data = bike) +
+  geom_point(mapping = aes(x = Solar.Radiation, y = Rented.Bike.Count))
+```
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Seasons, y = Solar.Radiation, fill = Seasons))
+```
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = as.factor(Hour), y = Solar.Radiation))
+```
+
+### Humidity
+
+```{r}
+ggplot(data = bike, mapping = aes(x = Humidity, y = ..density..)) +
+  geom_histogram(binwidth = 1, fill = "white", color = "black") +
+  geom_density(alpha = 0.5, fill = "steelblue")
+
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Humidity), coef = 1, fill = "steelblue")
+
+ggplot(data = bike) +
+  geom_bar(mapping = aes(x = Humidity), fill = "white", color = "black")
+```
+```{r}
+ggplot(data = bike) +
+  geom_point(mapping = aes(x = Humidity, y = Rented.Bike.Count))
+```
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Seasons, y = Humidity, fill = Seasons))
+```
+
+
+### Wind.speed
+
+```{r}
+ggplot(data = bike) +
+  geom_histogram(mapping = aes(x = Wind.speed), 
+                 binwidth = 0.1, 
+                 fill = "white", 
+                 color = "black")
+
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Wind.speed), fill = "steelblue")
+```
+
+```{r}
+ggplot(data = bike, mapping = aes(x = Wind.speed, y = ..density..)) +
+  geom_histogram(binwidth = 0.1, fill = "white", color = "black") +
+  geom_density(alpha = 0.5, fill = "steelblue") 
+```
+```{r}
+ggplot(data = bike) +
+  geom_boxplot(mapping = aes(x = Seasons, y = Wind.speed, fill = Seasons))
+```
+```{r}
+ggplot(data = bike) +
+  geom_point(mapping = aes(x = Wind.speed, y = Rented.Bike.Count))
+```
+### Rainfall
+
+```{r}
+ggplot(data = bike, mapping = aes(x = Rainfall)) +
+  geom_histogram()
+
+ggplot(data = bike) +
+  geom_point(mapping = aes(x = Rainfall, y = Rented.Bike.Count))
+```
+### Snowfall
+
+```{r}
+ggplot(data = bike, mapping = aes(x = Snowfall)) +
+  geom_histogram()
+
+ggplot(data = bike) +
+  geom_point(mapping = aes(x = Snowfall, y = Rented.Bike.Count))
+```
+
+## Scatterplot/correlation matrix
+
+```{r}
+library(GGally)
+```
+
+```{r}
+dplyr::select(bike, !c(Date, Seasons, Holiday, Functioning.Day)) %>%
+  ggcorr(method = c("everything", "pearson")) +
+  labs(title = "Pearson correlation")
+```
+
+```{r}
+bike_numeric <- bike %>%
+  dplyr::select(c(Rented.Bike.Count, Hour, Temperature, Humidity, Wind.speed, Visibility, Dew.point.temperature, Solar.Radiation, Rainfall, Snowfall))
+
+#shinypairs(bike_numeric)
+```
+
+## Time data
+
+```{r}
+library(lubridate)
+```
+
+
+```{r}
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+
+bike_time <- bike %>%
+  dplyr::select(Date, Rented.Bike.Count, Hour, Seasons) %>%
+  mutate(Date = dmy(Date),
+         Day = wday(Date, label = TRUE, abbr = FALSE),
+         Month = month(Date, label = TRUE))
+
+bike_time
+```
+### Rented bikes across weekdays
+
+```{r}
+ggplot(data = bike_time) +
+  geom_point(stat = "summary",
+             fun = "mean",
+             mapping = aes(x = Hour, y = Rented.Bike.Count, color = Day),
+             na.rm = T) +
+  geom_line(stat = "summary",
+            fun = "mean",
+            mapping = aes(x = Hour, y = Rented.Bike.Count, color = Day),
+            na.rm = T) +
+  scale_x_continuous(breaks = seq(0, 23, 1)) +
+  scale_y_continuous(breaks = seq(0, 1750, 250)) +
+  labs(title = "Average number of rented bikes across weekdays", 
+       y = "Average nb of rented bikes per hour", 
+       x = "Hour of the day") +
+  theme_bw() +
+  scale_color_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5), aspect.ratio = 0.40)
+```
+### Rented bikes months
+
+```{r}
+ggplot(data = bike_time) +
+  geom_point(stat = "summary",
+             fun = "mean",
+             mapping = aes(x = Hour, y = Rented.Bike.Count, color = Month),
+             na.rm = T) +
+  geom_line(stat = "summary",
+            fun = "mean",
+            mapping = aes(x = Hour, y = Rented.Bike.Count, color = Month),
+            na.rm = T) +
+  scale_x_continuous(breaks = seq(0, 23, 1)) +
+  scale_y_continuous(breaks = seq(0, 2500, 250)) +
+  labs(title = "Average number of rented bikes across months", 
+       y = "Average nb of rented bikes per hour", 
+       x = "Hour of the day") +
+  theme_grey() +
+  scale_color_brewer(palette = "Paired") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5), aspect.ratio = 0.40)
+```
+### Rented bikes across seasons
+
+```{r}
+ggplot(data = bike_time) +
+  geom_point(stat = "summary",
+             fun = "mean",
+             mapping = aes(x = Hour, y = Rented.Bike.Count, color = Seasons),
+             na.rm = T) +
+  geom_line(stat = "summary",
+            fun = "mean",
+            mapping = aes(x = Hour, y = Rented.Bike.Count, color = Seasons),
+            na.rm = T) +
+  scale_x_continuous(breaks = seq(0, 23, 1)) +
+  scale_y_continuous(breaks = seq(0, 2500, 250)) +
+  labs(title = "Average number of rented bikes across seasons", 
+       y = "Average nb of rented bikes per hour", 
+       x = "Hour of the day") +
+  theme_bw() +
+  scale_fill_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5), aspect.ratio = 0.40) 
+```
+# Feature importance
+
+```{r}
+install.packages("Boruta")
+```
+## Boruta
+
+```{r}
+library(Boruta)
+
+set.seed(23)
+boruta.train  <- Boruta(Rented.Bike.Count~., data = bike_time, doTrace = 2)
+
+boruta.train
+```
+## Encoding
+
+```{r}
+library(caret)
+```
+
+```{r}
+bike_with_time <- bike %>%
+  mutate(Date = dmy(Date),
+         Day = as.character(wday(Date, label = TRUE, abbr = FALSE)),
+         Month = as.character(month(Date, label = TRUE)))
+
+bike_with_time <- bike_with_time %>%
+  dplyr::select(-Date)
+
+bike_with_time
+```
+
+
+```{r}
+bike_dummy <- dummyVars(Rented.Bike.Count~., data = bike_with_time)
+
+bike_dummy <- predict(bike_dummy, newdata = bike_with_time)
+
+```
+
+```{r}
+bike_encoded <- as.data.frame.matrix(bike_dummy)
+
+bike_encoded$Rented.Bike.Count <- bike$Rented.Bike.Count
+
+bike_encoded
+```
+
+```{r}
+set.seed(23)
+boruta.train  <- Boruta(Rented.Bike.Count~., data = bike_encoded, doTrace = 2, maxRuns = 200)
+
+boruta.train
+```
+```{r}
+head(as.data.frame(boruta.train$finalDecision), 10)
+```
+
+```{r, fig.width = 10, fig.height= 5}
+plot(boruta.train, 
+     xlab = "", 
+     xaxt = "n", 
+     main = "Variable Importance (Boruta Algorithm)")
+
+lz <- lapply(1:ncol(boruta.train$ImpHistory),function(i)
+boruta.train$ImpHistory[is.finite(boruta.train$ImpHistory[,i]),i])
+
+names(lz) <- colnames(boruta.train$ImpHistory)
+Labels <- sort(sapply(lz,median))
+
+axis(side = 1,
+     las=2,
+     labels = names(Labels),
+     at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
+```
+
+```{r}
+attStats(boruta.train)
+```
+```{r}
+bike_df_encoded <- as.data.frame(bike_encoded)
+```
+
+```{r}
+bike_df_encoded
+```
+## RFE with caret
+
+```{r eval=FALSE, include=FALSE}
+# ensure the results are repeatable
+set.seed(7)
+# load the library
+library(mlbench)
+library(caret)
+
+# define the control using a random forest selection function
+control <- rfeControl(functions=rfFuncs, 
+                      method="repeatedcv", 
+                      number=3)
+# run the RFE algorithm
+results <- rfe(bike_df_encoded[,1:36], 
+               bike_df_encoded[,37], 
+               sizes=c(1:36), 
+               rfeControl=control)
+```
+
+```{r eval=FALSE, include=FALSE}
+# summarize the results
+print(results)
+# list the chosen features
+predictors(results)
+# plot the results
+trellis.par.set(caretTheme())
+plot(results, type=c("g", "o"))
+```
+
+```{r eval=FALSE, include=FALSE}
+plot(results, 
+     type=c("g", "o"), 
+     main = "RFE algorithm for feature selection", 
+     xlab = "Number of variables",
+     col.bg = "blue"
+     )
+```
+
+```{r eval=FALSE, include=FALSE}
+bestSubset = subset(results$resample, Variables == 31)
+
+ggplot(data =results$results, mapping = aes(x = Variables, y = RMSE)) +
+  geom_line(color = "steelblue") +
+  geom_point(color = "steelblue", shape = 21) +
+  geom_point(data = bestSubset[1,], color = "red") +
+  geom_text(data = bestSubset[1,], 
+            mapping = aes(label = "Optimal number", vjust = -1.5)) +
+  labs(title = "RFE Algorithm for feature selection",
+       x = "Number of variables",
+       y = "RMSE (Cross-validation)") +
+  theme_bw()
+```
+
+```{r}
+library(randomForest)
+library(dplyr)
+library(caret)
+
+bike_df_encoded <- bike_df_encoded %>%
+  rename(
+     NoHoliday = `HolidayNo Holiday`
+  )
+```
+
+```{r eval=FALSE, include=FALSE}
+rf_model <- randomForest(Rented.Bike.Count ~., data = bike_df_encoded, keep.forest=F, importance=T)
+varImpPlot(rf_model, type=1)
+```
+

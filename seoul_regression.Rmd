@@ -1,0 +1,355 @@
+---
+title: "Seoul Projet Regression"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Loading needed libraries
+
+```{r}
+library(tidyverse)
+library(dbplyr)
+library(lubridate)
+library(caret)
+library(ranger)
+library(DHARMa)
+library(randomForest)
+library(pscl)
+```
+
+# Loading the data
+
+```{r}
+# Creating a list of the column names
+col_names <- c("Date","Rented Bike Count","Hour", "Temperature", "Humidity", "Wind speed", "Visibility", "Dew point temperature", "Solar Radiation", "Rainfall", "Snowfall", "Seasons", "Holiday", "Functioning Day")
+
+
+# creating the dataframe and affecting the column names
+bike <- read.csv('SeoulBikeData.csv', header = FALSE, sep = ",", col.names = col_names, skip = 1)
+bike
+```
+```{r}
+summary(bike$Rented.Bike.Count)
+```
+
+```{r}
+# Print the mean and the variance of the output 
+
+sprintf("Variance of Y: %f", var(bike$Rented.Bike.Count))
+sprintf("Mean of Y: %f", mean(bike$Rented.Bike.Count))
+```
+
+
+```{r}
+
+checkWeekday <- function(dateNumber) {
+  if (dateNumber %in% c(6,7))
+    return (0)
+  else
+    return (1)
+}
+
+
+checkWeekEnd <- function(dateNumber) {
+  if (dateNumber %in% c(6,7))
+    return (1)
+  else
+    return (0)
+}
+
+checkHoliday <- function(holidayStatus) {
+  if (holidayStatus == "No Holiday")
+    return (0)
+  else
+    return (1)
+}
+
+# bike_with_time <- bike %>%
+#   mutate(Date = dmy(Date),
+#          Day = as.integer(wday(Date)),
+#          Weekday = sapply(X = Day, FUN = checkWeekday),
+#          WeekEnd = sapply(X = Day, FUN = checkWeekEnd),
+#          Holiday = sapply(X = Holiday, FUN = checkHoliday))
+
+
+# To set the language in english for the dummy variables
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+
+bike_with_time <- bike %>%
+  mutate(Date = dmy(Date),
+         Day = as.integer(wday(Date)),
+         Month = as.character(month(Date, label= TRUE)))
+
+
+bike_with_time <- bike_with_time %>%
+  dplyr::select(-Date)
+
+bike_dummy <- dummyVars(Rented.Bike.Count~., data = bike_with_time)
+
+bike_dummy <- predict(bike_dummy, newdata = bike_with_time)
+
+bike_encoded <- as.data.frame.matrix(bike_dummy)
+
+colnames(bike_encoded)[colnames(bike_encoded) == "HolidayNo Holiday"] <- "NoHoliday"
+
+bike_encoded$Rented.Bike.Count <- bike$Rented.Bike.Count
+
+# final dataframe encoded which will be split
+bike_encoded
+```
+
+```{r}
+library(MASS)
+library(splitTools)
+library(ModelMetrics)
+
+# splitting of the data into a training set and a testing set
+set.seed(23)
+inds <- partition(bike_encoded$Rented.Bike.Count, p = c(train = 0.8, test = 0.2))
+bike_train <- bike_encoded[inds$train,]
+bike_test <- bike_encoded[inds$test,]
+```
+
+# Poisson regression
+
+## Model
+
+```{r}
+# poisson regression model
+poisson_lm1 <- glm(Rented.Bike.Count ~., family = "poisson", data = bike_train)
+
+summary(poisson_lm1)
+```
+
+```{r}
+# creation of simulated residuals with DHARMa on the poisson regression model
+simulationOutput <- simulateResiduals(fittedModel = poisson_lm1, plot = F)
+
+# QQ plot
+plotQQunif(simulationOutput)
+
+# Check for dispersion in the data
+testDispersion(simulationOutput, plot = F)
+```
+
+
+# Quasipoisson Regression
+
+## Model
+
+```{r}
+# Quasipoisson model
+poisson_lm2 <- glm(Rented.Bike.Count ~., family = "quasipoisson", data = bike_train)
+
+summary(poisson_lm2)
+```
+
+# Negative binomial Regression
+
+## Model
+
+```{r}
+# Negative binomial (NB) model
+poisson_lm3 <- glm.nb(formula = Rented.Bike.Count ~ . -Rainfall, link = "log", data = bike_train)
+
+summary(poisson_lm3)
+```
+
+```{r}
+# Residual analysis of the NB-regression
+simulationOutput <- simulateResiduals(fittedModel = poisson_lm3, plot = F, refit = F)
+
+# QQ plot residuals for NB-regression
+plotQQunif(simulationOutput)
+
+# Check the dispersion
+testDispersion(simulationOutput)
+
+testZeroInflation(simulationOutput)
+```
+
+# Zero-inflated NB
+
+```{r}
+
+# Zero-inflated NB regression model
+zeroinfl_poisson <- zeroinfl(Rented.Bike.Count ~ . | Hour, data = bike_train, 
+                             dist = "negbin", link = "log")
+
+summary(zeroinfl_poisson)
+```
+
+
+```{r}
+# Zero-inflated NB-regression predictions
+y_pred_zeroinfl <- predict(zeroinfl_poisson, newdata = bike_test[,-31])
+
+rmse(y_pred_zeroinfl, bike_test[, 31])
+```
+
+
+# Comparisons of the 3 models (Poisson)
+
+## Predictions for poisson regressions
+
+```{r}
+nb_col = length(bike_train)[1]
+
+# Poisson regression predictions
+y_pred_poisson <- predict(poisson_lm1, 
+                          newdata = bike_test[, 1: nb_col-1], 
+                          type = "response")
+
+# Quasi-poisson regression predictions
+y_pred_quasipoisson <- predict(poisson_lm2, 
+                               newdata = bike_test[, 1:nb_col-1], 
+                               type = "response")
+
+# Negative binomial regression predictions
+y_pred_nb <- predict(poisson_lm3, 
+                     newdata = bike_test[, 1:nb_col-1], 
+                     type = "response")
+
+```
+
+# Try Linear Regression (Bad idea)
+
+```{r}
+model_lm <- lm(Rented.Bike.Count ~. -Visibility, data = bike_train)
+
+summary(model_lm)
+```
+
+## Predictions
+
+```{r}
+# Linear regression predictions
+y_pred_lm <- predict(model_lm, newdata = bike_test[, -nb_col], type = "response")
+```
+
+# Random Forest
+
+## Model
+
+```{r}
+rf_model <- randomForest(Rented.Bike.Count ~ ., data = bike_train)
+```
+
+## Predictions
+
+```{r}
+# Random Forest model predictions
+y_pred_rf <- predict(rf_model, newdata = bike_test[, -nb_col])
+```
+
+
+# Comparisons of the models
+
+```{r}
+sprintf("Poisson regression : %1.0f", rmse(bike_test[, nb_col], y_pred_poisson))
+sprintf("Quasipoisson : %1.0f", rmse(bike_test[, nb_col], y_pred_quasipoisson))
+sprintf("Negative binomiale : %1.0f",rmse(bike_test[, nb_col], y_pred_nb))
+sprintf("Linear Regression : %1.0f",rmse(bike_test[, nb_col], y_pred_lm))
+sprintf("Random Forest : %1.0f",rmse(bike_test[, nb_col], y_pred_rf))
+```
+
+```{r}
+# We can see that the min is negative for LR
+print("Linear Regression")
+summary(y_pred_lm)
+print("Poisson regression")
+summary(y_pred_poisson)
+print("Quasipoisson regression")
+summary(y_pred_quasipoisson)
+print("Negative binomial regression")
+summary(y_pred_nb)
+print("Random Forest")
+summary(y_pred_rf)
+```
+## Results
+
+```{r}
+sprintf("Poisson regression : %.3f", rmsle(bike_test[, nb_col], y_pred_poisson))
+sprintf("Quasipoisson : %.3f", rmsle(bike_test[, nb_col], y_pred_quasipoisson))
+sprintf("Negative binomiale : %.3f",rmsle(bike_test[, nb_col], y_pred_nb))
+sprintf("Random Forest : %.3f",rmsle(bike_test[, nb_col], y_pred_rf))
+```
+
+```{r}
+# number of features
+n_features <- nb_col
+
+# tuning grid
+tuning_grid <- expand.grid(
+  trees = seq(10, 1000, by = 20),
+  rmse  = NA
+)
+
+# Looping through the grid
+for(i in seq_len(nrow(tuning_grid))) {
+
+  # Fit a random forest for each hyperparameter value for the number of trees
+  fit <- ranger(
+    formula = Rented.Bike.Count ~ ., 
+    data = bike_train, 
+    num.trees = tuning_grid$trees[i],
+    mtry = floor(n_features / 3),
+    respect.unordered.factors = 'order',
+    verbose = FALSE,
+    seed = 123
+  )
+  
+  # Extract OOB RMSE
+  tuning_grid$rmse[i] <- sqrt(fit$prediction.error)
+}
+
+ggplot(tuning_grid, aes(trees, rmse)) +
+  geom_line(size = 1) +
+  ylab("OOB Error (RMSE)") +
+  xlab("Number of trees")
+```
+
+```{r}
+
+# tuning grid
+tuning_grid <- expand.grid(
+  trees = seq(10, 1000, by = 10),
+  mtry  = c(5, 10, 15, 20, 21, 30),
+  rmse  = NA
+)
+
+# Looping through the grid
+for(i in seq_len(nrow(tuning_grid))) {
+  
+  # Fit a random forest for each nb of trees and mtry values
+  fit <- ranger(
+  formula    = Rented.Bike.Count ~ ., 
+  data       = bike_train, 
+  num.trees  = tuning_grid$trees[i],
+  mtry       = tuning_grid$mtry[i],
+  respect.unordered.factors = 'order',
+  verbose    = FALSE,
+  seed       = 23
+)
+  # Extract OOB RMSE
+  tuning_grid$rmse[i] <- sqrt(fit$prediction.error)
+  
+}
+
+labels <- tuning_grid %>%
+  filter(trees == 990) %>%
+  mutate(mtry = as.factor(mtry))
+
+#Plot of the grid search
+tuning_grid %>%
+  mutate(mtry = as.factor(mtry)) %>%
+  ggplot(aes(trees, rmse, color = mtry)) +
+  geom_line(size = 1, show.legend = T) +
+  ggrepel::geom_text_repel(data = labels, aes(trees, rmse, label = mtry), nudge_x = 50, show.legend = FALSE) +
+  ylab("OOB Error (RMSE)") +
+  xlab("Number of trees") +
+  labs(title = "Grid search on ntree and mtry")
+
+```
+
